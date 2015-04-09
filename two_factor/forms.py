@@ -2,6 +2,7 @@ from binascii import unhexlify
 from time import time
 
 from django import forms
+from django.conf import settings
 from django.forms import ModelForm, Form
 from django.utils.translation import ugettext_lazy as _
 
@@ -134,6 +135,12 @@ class DisableForm(forms.Form):
 class AuthenticationTokenForm(OTPAuthenticationFormMixin, Form):
     otp_token = forms.IntegerField(label=_("Token"), min_value=1,
                                    max_value=int('9' * totp_digits()))
+
+    trust_days = getattr(settings, 'AGENT_TRUST_DAYS' 0)
+
+    if 'two_factor.plugins.agent_trust' in settings.INSTALLED_APPS
+    and trust_days > 0:
+        trust_this_agent = forms.BooleanField(label=_("Trust this browser for %s days" % (trust_days,)), required=False)
 
     def __init__(self, user, initial_device, **kwargs):
         """

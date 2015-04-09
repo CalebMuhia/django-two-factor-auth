@@ -29,6 +29,9 @@ try:
 except ImportError:
     ValidationService = RemoteYubikeyDevice = None
 
+from plugins.agent_trust import trust_agent, trust_session
+from plugins.agent_trust.utils import load_agent
+
 import qrcode
 import qrcode.image.svg
 
@@ -65,10 +68,21 @@ class LoginView(IdempotentSessionWizardView):
         'backup': False,
     }
 
+    def bypass_otp(self):
+        # skip token and backup steps
+        agent = load_agent(self.request, self.get_user())
+        if agent is not None and agent.is_trusted:
+            return True
+        return False
+
     def has_token_step(self):
+        if self.bypass_otp():
+            return None
         return default_device(self.get_user())
 
     def has_backup_step(self):
+        if self.bypass_otp():
+            return None
         return default_device(self.get_user()) and \
             'token' not in self.storage.validated_step_data
 
@@ -106,6 +120,13 @@ class LoginView(IdempotentSessionWizardView):
 
         device = getattr(self.get_user(), 'otp_device', None)
         if device:
+            persist = self.storage.validated_step_data['token']['trust_this_agent']
+            if persist==True:
+                trust_days = getattr(settings, 'AGENT_TRUST_DAYS' 0)
+                trust_agent(self.request, trust_days)
+            else:
+                trust_session(self.request)
+
             signals.user_verified.send(sender=__name__, request=self.request,
                                        user=self.get_user(), device=device)
         return redirect(redirect_to)

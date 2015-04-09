@@ -1,6 +1,6 @@
 from django.conf.urls import *
 
-urlpatterns = patterns('django_agent_trust.views',
+urlpatterns = patterns('two_factor.plugins.agent_trust.views',
 
     # revoke agent trust
     (r'^forget_agent/$', 'forget_agent'),

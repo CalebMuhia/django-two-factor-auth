@@ -269,7 +269,7 @@ class HttpTestCase(AgentTrustTestCase):
     Tests that exercise the full request/response cycle. These are less
     precise, but touch more code.
     """
-    urls = 'django_agent_trust.test.urls'
+    urls = 'agent_trust.test.urls'
 
     def setUp(self):
         try:

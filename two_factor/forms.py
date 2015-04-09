@@ -15,6 +15,11 @@ try:
 except ImportError:
     RemoteYubikeyDevice = YubikeyDevice = None
 
+if 'two_factor.plugins.agent_trust' in settings.INSTALLED_APPS:
+    agent_trust = True
+else:
+    agent_trust = False
+
 from .models import (PhoneDevice, get_available_phone_methods,
                      get_available_methods)
 from .utils import totp_digits
@@ -143,11 +148,11 @@ class AuthenticationTokenForm(OTPAuthenticationFormMixin, Form):
     otp_token = forms.IntegerField(label=_("Token"), min_value=1,
                                    max_value=int('9' * totp_digits()))
 
-    trust_days = getattr(settings, 'AGENT_TRUST_DAYS' 0)
+    if agent_trust:
+        trust_days = getattr(settings, 'AGENT_TRUST_DAYS', 0)
 
-    if 'two_factor.plugins.agent_trust' in settings.INSTALLED_APPS
-    and trust_days > 0:
-        trust_this_agent = forms.BooleanField(label=_("Trust this browser for %s days" % (trust_days,)), required=False)
+        if trust_days > 0:
+            trust_this_agent = forms.BooleanField(label=_("Trust this browser for %s days" % (trust_days,)), required=False)
 
     def __init__(self, user, initial_device, **kwargs):
         """

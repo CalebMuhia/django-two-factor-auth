@@ -47,6 +47,9 @@ class AgentSettings(models.Model):
 
         return six.u("AgentSettings: {0}".format(username))
 
+    class Meta:
+        verbose_name_plural = "Agent settings"
+
 
 class Agent(object):
     """

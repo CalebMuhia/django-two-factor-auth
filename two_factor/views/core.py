@@ -29,8 +29,12 @@ try:
 except ImportError:
     ValidationService = RemoteYubikeyDevice = None
 
-from plugins.agent_trust import trust_agent, trust_session
-from plugins.agent_trust.utils import load_agent
+if 'two_factor.plugins.agent_trust' in settings.INSTALLED_APPS:
+    agent_trust = True
+    from two_factor.plugins.agent_trust import trust_agent, trust_session
+    from two_factor.plugins.agent_trust.utils import load_agent
+else:
+    agent_trust = False
 
 import qrcode
 import qrcode.image.svg
@@ -69,6 +73,10 @@ class LoginView(IdempotentSessionWizardView):
     }
 
     def bypass_otp(self):
+        # don't bypass if agent_trust is not enabled
+        if not agent_trust:
+            return False
+
         # skip token and backup steps
         agent = load_agent(self.request, self.get_user())
         if agent is not None and agent.is_trusted:
@@ -120,12 +128,14 @@ class LoginView(IdempotentSessionWizardView):
 
         device = getattr(self.get_user(), 'otp_device', None)
         if device:
-            persist = self.storage.validated_step_data['token']['trust_this_agent']
-            if persist==True:
-                trust_days = getattr(settings, 'AGENT_TRUST_DAYS' 0)
-                trust_agent(self.request, trust_days)
-            else:
-                trust_session(self.request)
+
+            if agent_trust:
+                persist = self.storage.validated_step_data['token']['trust_this_agent']
+                if persist==True:
+                    trust_days = getattr(settings, 'AGENT_TRUST_DAYS', 0)
+                    trust_agent(self.request, trust_days)
+                else:
+                    trust_session(self.request)
 
             signals.user_verified.send(sender=__name__, request=self.request,
                                        user=self.get_user(), device=device)

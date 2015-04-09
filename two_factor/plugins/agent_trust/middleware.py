@@ -22,12 +22,12 @@ class AgentMiddleware(object):
     trusted agents.
 
     This middleware will set ``request.agent`` to an instance of
-    :class:`django_agent_trust.models.Agent`. ``request.agent.is_trusted`` will
+    :class:`agent_trust.models.Agent`. ``request.agent.is_trusted`` will
     tell you whether the user's agent has been trusted.
     """
     def __init__(self):
         if django.VERSION < (1, 4):
-            warn('django_agent_trust requires Django 1.4 or higher')
+            warn('agent_trust requires Django 1.4 or higher')
             raise MiddlewareNotUsed()
 
     def process_request(self, request):

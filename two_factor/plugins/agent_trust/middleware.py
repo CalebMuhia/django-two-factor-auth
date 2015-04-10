@@ -32,8 +32,6 @@ class AgentMiddleware(object):
 
     def process_request(self, request):
         if request.user.is_authenticated():
-            AgentSettings.objects.get_or_create(user=request.user)
-
             agent = load_agent(request)
             if (agent.session is not None) and (agent.session != request.session.get(SESSION_TOKEN_KEY)):
                 agent = Agent.untrusted_agent(request.user)

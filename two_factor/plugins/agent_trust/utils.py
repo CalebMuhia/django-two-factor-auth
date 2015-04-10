@@ -21,7 +21,7 @@ def load_agent(request, user=None):
         return None
 
     cookie_name = _cookie_name(_get_username(user))
-    max_age = _max_cookie_age(user.agentsettings)
+    max_age = _max_cookie_age(user)
 
     # 'e30=' is base64 for '{}'
     encoded = request.get_signed_cookie(cookie_name, default='e30=',
@@ -39,7 +39,7 @@ def _save_agent(agent, response):
 
     cookie_name = _cookie_name(_get_username(agent.user))
     encoded = _encode_cookie(agent, agent.user)
-    max_age = _max_cookie_age(agent.user.agentsettings)
+    max_age = _max_cookie_age(agent.user)
 
     response.set_signed_cookie(cookie_name, encoded, max_age=max_age,
                                path=settings.AGENT_COOKIE_PATH,
@@ -75,7 +75,9 @@ def _should_discard_agent(agent):
     if (expiration is not None) and (expiration < datetime.now()):
         return True
 
-    if agent.serial < agent.user.agentsettings.serial:
+    agentsettings = AgentSettings.objects.get_or_create(user=agent.user)[0]
+
+    if agent.serial < agentsettings.serial:
         return True
 
     return False
@@ -92,10 +94,12 @@ def _cookie_name(username):
 
     return '{0}-{1}'.format(settings.AGENT_COOKIE_NAME, suffix)
 
-def _max_cookie_age(agentsettings):
+def _max_cookie_age(user):
     """
     Returns the max cookie age based on inactivity limits.
     """
+    agentsettings = AgentSettings.objects.get_or_create(user=user)[0]
+
     days = settings.AGENT_INACTIVITY_DAYS
 
     try:

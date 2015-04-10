@@ -70,7 +70,7 @@ class AgentCodingTestCase(AgentTrustTestCase):
         return self.alice.agentsettings
 
     def test_coverage(self):
-        six.u(str(self.agentsettings))
+        six.u(str(self.alice.agentsettings))
 
     def test_trust_anonymous(self):
         with self.assertRaises(Exception):
@@ -108,7 +108,7 @@ class AgentCodingTestCase(AgentTrustTestCase):
 
     def test_expired_user_only(self):
         trusted_at = now() - timedelta(days=7)
-        self.agentsettings.trust_days = 5
+        self.alice.agentsettings.trust_days = 5
 
         agent = self._roundtrip(True, trusted_at, None, 1, None)
 
@@ -123,7 +123,7 @@ class AgentCodingTestCase(AgentTrustTestCase):
 
     def test_expired_global_precedence(self):
         trusted_at = now() - timedelta(days=7)
-        self.agentsettings.trust_days = 14
+        self.alice.agentsettings.trust_days = 14
 
         with settings(AGENT_TRUST_DAYS=5):
             agent = self._roundtrip(True, trusted_at, 14, 1, None)
@@ -132,7 +132,7 @@ class AgentCodingTestCase(AgentTrustTestCase):
 
     def test_expired_user_precedence(self):
         trusted_at = now() - timedelta(days=7)
-        self.agentsettings.trust_days = 5
+        self.alice.agentsettings.trust_days = 5
 
         with settings(AGENT_TRUST_DAYS=14):
             agent = self._roundtrip(True, trusted_at, 14, 1, None)
@@ -141,7 +141,7 @@ class AgentCodingTestCase(AgentTrustTestCase):
 
     def test_expired_agent_precedence(self):
         trusted_at = now() - timedelta(days=7)
-        self.agentsettings.trust_days = 14
+        self.alice.agentsettings.trust_days = 14
 
         with settings(AGENT_TRUST_DAYS=14):
             agent = self._roundtrip(True, trusted_at, 5, 1, None)
@@ -150,7 +150,7 @@ class AgentCodingTestCase(AgentTrustTestCase):
 
     def test_expired_none(self):
         trusted_at = now() - timedelta(days=7)
-        self.agentsettings.trust_days = 14
+        self.alice.agentsettings.trust_days = 14
 
         with settings(AGENT_TRUST_DAYS=14):
             agent = self._roundtrip(True, trusted_at, 14, 1, None)
@@ -161,7 +161,7 @@ class AgentCodingTestCase(AgentTrustTestCase):
 
     def test_revoked(self):
         trusted_at = now()
-        self.agentsettings.serial = 2
+        self.alice.agentsettings.serial = 2
 
         agent = self._roundtrip(True, trusted_at, None, 1, None)
 
@@ -185,12 +185,12 @@ class AgentCodingTestCase(AgentTrustTestCase):
     def test_inactivity_config(self):
         with self.assertRaises(ImproperlyConfigured):
             with settings(AGENT_INACTIVITY_DAYS=()):
-                self.middleware._max_cookie_age(self.agentsettings)
+                self.middleware._max_cookie_age(self.alice)
 
     def test_inactivity_precedence(self):
-        self.agentsettings.inactivity_days = 30
+        self.alice.agentsettings.inactivity_days = 30
 
-        self.assertEqual(self.middleware._max_cookie_age(self.agentsettings), 30 * 86400)
+        self.assertEqual(self.middleware._max_cookie_age(self.alice), 30 * 86400)
 
     def _roundtrip(self, *args, **kwargs):
         agent = Agent(self.alice, *args, **kwargs)

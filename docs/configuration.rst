@@ -15,22 +15,22 @@ General Settings
   Which gateway to use for making phone calls. Should be set to a module or
   object providing a ``make_call`` method. Currently two gateways are bundled:
 
-  * ``two_factor.gateways.twilio.gateway.Twilio`` for making real phone calls using
+  * ``'two_factor.gateways.twilio.gateway.Twilio'`` for making real phone calls using
     Twilio_.
-  * ``two_factor.gateways.fake.Fake``  for development, recording tokens to the
+  * ``'two_factor.gateways.fake.Fake'``  for development, recording tokens to the
     default logger.
 
 ``TWO_FACTOR_SMS_GATEWAY`` (default: ``None``)
   Which gateway to use for sending text messages. Should be set to a module or
   object providing a ``send_sms`` method. Currently two gateways are bundled:
 
-  * ``two_factor.gateways.twilio.gateway.Twilio`` for sending real text messages using
+  * ``'two_factor.gateways.twilio.gateway.Twilio'`` for sending real text messages using
     Twilio_.
-  * ``two_factor.gateways.fake.Fake``  for development, recording tokens to the
+  * ``'two_factor.gateways.fake.Fake'``  for development, recording tokens to the
     default logger.
 
 ``LOGIN_URL``
-  Should point to the login view provided by this application. This login view
+  Should point to the login view provided by this application as described in setup. This login view
   handles password authentication followed by a one-time password exchange if
   enabled for that account.
 
@@ -48,8 +48,8 @@ General Settings
   on IE8 and below. If you have PIL, Pillow or pyimaging installed
   you may wish to use PNG images instead.
 
-  * ``qrcode.image.pil.PilImage`` may be used for PIL/Pillow
-  * ``qrcode.image.pure.PymagingImage`` may be used for pyimaging
+  * ``'qrcode.image.pil.PilImage'`` may be used for PIL/Pillow
+  * ``'qrcode.image.pure.PymagingImage'`` may be used for pyimaging
 
   For more QR factories that are available see python-qrcode_.
 

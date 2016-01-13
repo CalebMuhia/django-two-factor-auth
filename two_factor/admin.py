@@ -7,7 +7,6 @@ from django.conf import settings
 from django.contrib import admin
 from django.contrib.admin import AdminSite
 from django.contrib.auth import REDIRECT_FIELD_NAME
-from django.core.urlresolvers import reverse
 from django.shortcuts import redirect
 
 from .utils import monkeypatch_method
@@ -39,7 +38,7 @@ class AdminSiteOTPRequiredMixin(object):
         else:
             url = request.get_full_path()
         return redirect('%s?%s' % (
-            reverse('two_factor:login'),
+            settings.LOGIN_URL,
             urlencode({REDIRECT_FIELD_NAME: url})
         ))
 
@@ -62,7 +61,7 @@ def patch_admin():
         else:
             url = request.get_full_path()
         return redirect('%s?%s' % (
-            reverse('two_factor:login'),
+            settings.LOGIN_URL,
             urlencode({REDIRECT_FIELD_NAME: url})
         ))
 
@@ -72,8 +71,6 @@ def unpatch_admin():
 
 
 original_login = AdminSite.login
-if getattr(settings, 'TWO_FACTOR_PATCH_ADMIN', True):
-    patch_admin()
 
 
 class PhoneDeviceAdmin(admin.ModelAdmin):

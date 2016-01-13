@@ -33,7 +33,7 @@ from django.core.management import call_command, CommandError
 from django.core.urlresolvers import reverse
 from django.test import TestCase
 from django.test.utils import override_settings
-from django.utils import translation, six
+from django.utils import six
 
 try:
     from django.contrib.auth import get_user_model
@@ -54,8 +54,6 @@ except ImportError:
 import qrcode.image.svg
 
 from two_factor.admin import patch_admin, unpatch_admin
-from two_factor.gateways.fake import Fake
-from two_factor.gateways.twilio.gateway import Twilio
 from two_factor.models import PhoneDevice
 from two_factor.utils import backup_phones, default_device, get_otpauth_url, totp_digits
 from two_factor.validators import validate_international_phonenumber
@@ -534,7 +532,9 @@ class OTPRequiredMixinTest(UserMixin, TestCase):
         self.assertEqual(response.status_code, 200)
 
 
+@override_settings(ROOT_URLCONF='tests.urls_admin')
 class AdminPatchTest(TestCase):
+
     def setUp(self):
         patch_admin()
 
@@ -548,7 +548,9 @@ class AdminPatchTest(TestCase):
         self.assertRedirects(response, redirect_to)
 
 
+@override_settings(ROOT_URLCONF='tests.urls_admin')
 class AdminSiteTest(UserMixin, TestCase):
+
     def setUp(self):
         super(AdminSiteTest, self).setUp()
         self.user = self.create_superuser()
@@ -557,6 +559,15 @@ class AdminSiteTest(UserMixin, TestCase):
     def test_default_admin(self):
         response = self.client.get('/admin/')
         self.assertEqual(response.status_code, 200)
+
+
+@override_settings(ROOT_URLCONF='tests.urls_otp_admin')
+class OTPAdminSiteTest(UserMixin, TestCase):
+
+    def setUp(self):
+        super(OTPAdminSiteTest, self).setUp()
+        self.user = self.create_superuser()
+        self.login_user()
 
     def test_otp_admin_without_otp(self):
         response = self.client.get('/otp_admin/', follow=True)
@@ -753,109 +764,6 @@ class DisableTest(UserMixin, TestCase):
         # cannot disable twice
         response = self.client.get(reverse('two_factor:disable'))
         self.assertRedirects(response, str(settings.LOGIN_REDIRECT_URL))
-
-
-class TwilioGatewayTest(TestCase):
-    def test_call_app(self):
-        url = reverse('two_factor:twilio_call_app', args=['123456'])
-        response = self.client.get(url)
-        self.assertEqual(response.content,
-                         b'<?xml version="1.0" encoding="UTF-8" ?>'
-                         b'<Response>'
-                         b'  <Gather timeout="15" numDigits="1" finishOnKey="">'
-                         b'    <Say language="en">Hi, this is testserver calling. '
-                         b'Press any key to continue.</Say>'
-                         b'  </Gather>'
-                         b'  <Say language="en">You didn\'t press any keys. Good bye.</Say>'
-                         b'</Response>')
-
-        url = reverse('two_factor:twilio_call_app', args=['123456'])
-        response = self.client.post(url)
-        self.assertEqual(response.content,
-                         b'<?xml version="1.0" encoding="UTF-8" ?>'
-                         b'<Response>'
-                         b'  <Say language="en">Your token is 1. 2. 3. 4. 5. 6. '
-                         b'Repeat: 1. 2. 3. 4. 5. 6. Good bye.</Say>'
-                         b'</Response>')
-
-        # there is a en-gb voice
-        response = self.client.get('%s?%s' % (url, urlencode({'locale': 'en-gb'})))
-        self.assertContains(response, '<Say language="en-gb">')
-
-        # there is no nl voice
-        response = self.client.get('%s?%s' % (url, urlencode({'locale': 'nl-nl'})))
-        self.assertContains(response, '<Say language="en">')
-
-    @override_settings(
-        TWILIO_ACCOUNT_SID='SID',
-        TWILIO_AUTH_TOKEN='TOKEN',
-        TWILIO_CALLER_ID='+456',
-    )
-    @patch('two_factor.gateways.twilio.gateway.TwilioRestClient')
-    def test_gateway(self, client):
-        twilio = Twilio()
-        client.assert_called_with('SID', 'TOKEN')
-
-        for code in ['654321', '054321', '87654321', '07654321']:
-            twilio.make_call(device=Mock(number='+123'), token=code)
-            client.return_value.calls.create.assert_called_with(
-                from_='+456', to='+123', method='GET', if_machine='Hangup', timeout=15,
-                url='http://testserver/twilio/inbound/two_factor/%s/?locale=en-us' % code)
-
-            twilio.send_sms(device=Mock(number='+123'), token=code)
-            client.return_value.sms.messages.create.assert_called_with(
-                to='+123', body='Your authentication token is %s' % code, from_='+456')
-
-            client.return_value.calls.create.reset_mock()
-            with translation.override('en-gb'):
-                twilio.make_call(device=Mock(number='+123'), token=code)
-                client.return_value.calls.create.assert_called_with(
-                    from_='+456', to='+123', method='GET', if_machine='Hangup', timeout=15,
-                    url='http://testserver/twilio/inbound/two_factor/%s/?locale=en-gb' % code)
-
-            client.return_value.calls.create.reset_mock()
-            with translation.override('en-gb'):
-                twilio.make_call(device=Mock(number='+123'), token=code)
-                client.return_value.calls.create.assert_called_with(
-                    from_='+456', to='+123', method='GET', if_machine='Hangup', timeout=15,
-                    url='http://testserver/twilio/inbound/two_factor/%s/?locale=en-gb' % code)
-
-    @override_settings(
-        TWILIO_ACCOUNT_SID='SID',
-        TWILIO_AUTH_TOKEN='TOKEN',
-        TWILIO_CALLER_ID='+456',
-    )
-    @patch('two_factor.gateways.twilio.gateway.TwilioRestClient')
-    def test_invalid_twilio_language(self, client):
-        # This test assumes an invalid twilio voice language being present in
-        # the Arabic translation. Might need to create a faux translation when
-        # the translation is fixed.
-
-        url = reverse('two_factor:twilio_call_app', args=['123456'])
-        with self.assertRaises(NotImplementedError):
-            self.client.get('%s?%s' % (url, urlencode({'locale': 'ar'})))
-
-        # make_call doesn't use the voice_language, but it should raise early
-        # to ease debugging.
-        with self.assertRaises(NotImplementedError):
-            twilio = Twilio()
-            with translation.override('ar'):
-                twilio.make_call(device=Mock(number='+123'), token='654321')
-
-
-class FakeGatewayTest(TestCase):
-    @patch('two_factor.gateways.fake.logger')
-    def test_gateway(self, logger):
-        fake = Fake()
-
-        for code in ['654321', '87654321']:
-            fake.make_call(device=Mock(number='+123'), token=code)
-            logger.info.assert_called_with(
-                'Fake call to %s: "Your token is: %s"', '+123', code)
-
-            fake.send_sms(device=Mock(number='+123'), token=code)
-            logger.info.assert_called_with(
-                'Fake SMS to %s: "Your token is: %s"', '+123', code)
 
 
 class PhoneDeviceTest(UserMixin, TestCase):
@@ -1072,95 +980,3 @@ class StatusCommandTest(UserMixin, TestCase):
         call_command('two_factor_status', 'user0@example.com', 'user1@example.com', stdout=stdout)
         self.assertEqual(stdout.getvalue(), 'user0@example.com: enabled\n'
                                             'user1@example.com: disabled\n')
-
-
-@unittest.skipUnless(ValidationService, 'No YubiKey support')
-class YubiKeyTest(UserMixin, TestCase):
-    @patch('otp_yubikey.models.RemoteYubikeyDevice.verify_token')
-    def test_setup(self, verify_token):
-        user = self.create_user()
-        self.login_user()
-        verify_token.return_value = [True, False]  # only first try is valid
-
-        # Should be able to select YubiKey method
-        response = self.client.post(reverse('two_factor:setup'),
-                                    data={'setup_view-current_step': 'welcome'})
-        self.assertContains(response, 'YubiKey')
-
-        # self.assertRaises is broken on Python 2.7.10. See also
-        # https://bugs.python.org/issue24134 and
-        # https://code.djangoproject.com/ticket/24903.
-        if sys.version_info < (2, 7, 10) or sys.version_info >= (2, 7, 11):
-            # Without ValidationService it won't work
-            with six.assertRaisesRegex(self, KeyError, "No ValidationService "
-                                                       "found with name 'default'"):
-                self.client.post(reverse('two_factor:setup'),
-                                 data={'setup_view-current_step': 'method',
-                                       'method-method': 'yubikey'})
-
-        # With a ValidationService, should be able to input a YubiKey
-        ValidationService.objects.create(name='default', param_sl='', param_timeout='')
-
-        response = self.client.post(reverse('two_factor:setup'),
-                                    data={'setup_view-current_step': 'method',
-                                          'method-method': 'yubikey'})
-        self.assertContains(response, 'YubiKey:')
-
-        # Should call verify_token and create the device on finish
-        token = 'jlvurcgekuiccfcvgdjffjldedjjgugk'
-        response = self.client.post(reverse('two_factor:setup'),
-                                    data={'setup_view-current_step': 'yubikey',
-                                          'yubikey-token': token})
-        self.assertRedirects(response, reverse('two_factor:setup_complete'))
-        verify_token.assert_called_with(token)
-
-        yubikeys = user.remoteyubikeydevice_set.all()
-        self.assertEqual(len(yubikeys), 1)
-        self.assertEqual(yubikeys[0].name, 'default')
-
-    @patch('otp_yubikey.models.RemoteYubikeyDevice.verify_token')
-    def test_login(self, verify_token):
-        user = self.create_user()
-        verify_token.return_value = [True, False]  # only first try is valid
-        service = ValidationService.objects.create(name='default', param_sl='', param_timeout='')
-        user.remoteyubikeydevice_set.create(service=service, name='default')
-
-        # Input type should be text, not numbers like other tokens
-        response = self.client.post(reverse('two_factor:login'),
-                                    data={'auth-username': 'bouke@example.com',
-                                          'auth-password': 'secret',
-                                          'login_view-current_step': 'auth'})
-        self.assertContains(response, 'YubiKey:')
-        self.assertIsInstance(response.context_data['wizard']['form'].fields['otp_token'],
-                              forms.CharField)
-
-        # Should call verify_token
-        token = 'cjikftknbiktlitnbltbitdncgvrbgic'
-        response = self.client.post(reverse('two_factor:login'),
-                                    data={'token-otp_token': token,
-                                          'login_view-current_step': 'token'})
-        self.assertRedirects(response, str(settings.LOGIN_REDIRECT_URL))
-        verify_token.assert_called_with(token)
-
-    def test_show_correct_label(self):
-        """
-        The token form replaces the input field when the user's device is a
-        YubiKey. However when the user decides to enter a backup token, the
-        normal backup token form should be shown. Refs #50.
-        """
-        user = self.create_user()
-        service = ValidationService.objects.create(name='default', param_sl='', param_timeout='')
-        user.remoteyubikeydevice_set.create(service=service, name='default')
-        backup = user.staticdevice_set.create(name='backup')
-        backup.token_set.create(token='RANDOM')
-
-        response = self.client.post(reverse('two_factor:login'),
-                                    data={'auth-username': 'bouke@example.com',
-                                          'auth-password': 'secret',
-                                          'login_view-current_step': 'auth'})
-        self.assertContains(response, 'YubiKey:')
-
-        response = self.client.post(reverse('two_factor:login'),
-                                    data={'wizard_goto_step': 'backup'})
-        self.assertNotContains(response, 'YubiKey:')
-        self.assertContains(response, 'Token:')

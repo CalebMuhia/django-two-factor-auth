@@ -131,9 +131,16 @@ class LoginView(IdempotentSessionWizardView):
 
         device = getattr(self.get_user(), 'otp_device', None)
         if device:
-
             if agent_trust:
-                persist = self.storage.validated_step_data['token']['trust_this_agent']
+                persist = False
+                try:
+                    if 'token' in self.storage.validated_step_data:
+                        persist = self.storage.validated_step_data['token']['trust_this_agent']
+                    elif 'backup' in self.storage.validated_step_data:
+                        persist = self.storage.validated_step_data['backup']['trust_this_agent']
+                except:
+                    pass
+
                 if persist==True:
                     trust_days = getattr(settings, 'AGENT_TRUST_DAYS', 0)
                     trust_agent(self.request, trust_days)
